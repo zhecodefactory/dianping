@@ -144,44 +144,83 @@ public class ShopServiceImpl implements ShopService {
 //
 //        map.put("ShopModelList",ShopModelList);
 
-
         Request request = new Request("GET","/shop/_search");
-        String reqJson = "{\"query\":{\n" +
-                "    \"match\":{\"name\":\""+keyword+"\"}\n" +
-                "  },\n" +
-                "  \"_source\": \"*\", \n" +
-                "  \"script_fields\": {\n" +
-                "    \"distance\": {\n" +
-                "      \"script\": {\n" +
-                "        \"source\": \"haversin(lat,lon,doc['location'].lat,doc['location'].lon)\",\n" +
-                "        \"lang\": \"expression\",\n" +
-                "        \"params\": {\"lat\":"+latitude.toString()+",\"lon\":"+longitude.toString()+"}\n" +
-                "      }\n" +
-                "    }\n" +
-                "  },\n" +
-                "  \"sort\": [\n" +
-                "    {\n" +
-                "      \"_geo_distance\": {\n" +
-                "        \"location\":{\n" +
-                "          \"lat\":"+latitude.toString()+",\n" +
-                "          \"lon\":"+longitude.toString()+"\n" +
-                "        },\n" +
-                "        \"order\": \"asc\",\n" +
-                "        \"unit\": \"km\",\n" +
-                "        \"distance_type\": \"arc\"\n" +
-                "      }\n" +
-                "    }\n" +
-                "  ]}";
 
-        System.out.println("reqJson = " + reqJson);
 
-        request.setJsonEntity(reqJson);
+        /*构建请求*/
+        JSONObject jsonRequest = new JSONObject();
+        //构建source部分
+        jsonRequest.put("_source","*");
+        //构建自定义距离字段
+        jsonRequest.put("script_fields",new JSONObject());
+        jsonRequest.getJSONObject("script_fields").put("distance",new JSONObject());
+        jsonRequest.getJSONObject("script_fields").getJSONObject("distance").put("script",new JSONObject());
+        jsonRequest.getJSONObject("script_fields").getJSONObject("distance").getJSONObject("script")
+                .put("source","haversin(lat,lon,doc['location'].lat,doc['location'].lon)");
+        jsonRequest.getJSONObject("script_fields").getJSONObject("distance").getJSONObject("script")
+                .put("lang","expression");
+        jsonRequest.getJSONObject("script_fields").getJSONObject("distance").getJSONObject("script")
+                .put("params",new JSONObject());
+        jsonRequest.getJSONObject("script_fields").getJSONObject("distance").getJSONObject("script")
+                .getJSONObject("params").put("lat",latitude);
+        jsonRequest.getJSONObject("script_fields").getJSONObject("distance").getJSONObject("script")
+                .getJSONObject("params").put("lon",longitude);
+
+        //构建query
+        jsonRequest.put("query",new JSONObject());
+        jsonRequest.getJSONObject("query").put("match",new JSONObject());
+        jsonRequest.getJSONObject("query").getJSONObject("match").put("name",keyword);
+
+        //构建排序
+        jsonRequest.put("sort",new JSONArray());
+        jsonRequest.getJSONArray("sort").add(new JSONObject());
+        jsonRequest.getJSONArray("sort").getJSONObject(0).put("_geo_distance",new JSONObject());
+        jsonRequest.getJSONArray("sort").getJSONObject(0).getJSONObject("_geo_distance").put("location",new JSONObject());
+        jsonRequest.getJSONArray("sort").getJSONObject(0).getJSONObject("_geo_distance").getJSONObject("location")
+                .put("lat",latitude);
+        jsonRequest.getJSONArray("sort").getJSONObject(0).getJSONObject("_geo_distance").getJSONObject("location")
+                .put("lon",longitude);
+        jsonRequest.getJSONArray("sort").getJSONObject(0).getJSONObject("_geo_distance")
+                .put("order","asc");
+        jsonRequest.getJSONArray("sort").getJSONObject(0).getJSONObject("_geo_distance")
+                .put("unit","km");
+        jsonRequest.getJSONArray("sort").getJSONObject(0).getJSONObject("_geo_distance")
+                .put("distance_type","arc");
+
+        String s = jsonRequest.toJSONString();
+        System.out.println("s = " + s);
+
+//        String reqJson = "{\"query\":{\n" +
+//                "    \"match\":{\"name\":\""+keyword+"\"}\n" +
+//                "  },\n" +
+//                "  \"_source\": \"*\", \n" +
+//                "  \"script_fields\": {\n" +
+//                "    \"distance\": {\n" +
+//                "      \"script\": {\n" +
+//                "        \"source\": \"haversin(lat,lon,doc['location'].lat,doc['location'].lon)\",\n" +
+//                "        \"lang\": \"expression\",\n" +
+//                "        \"params\": {\"lat\":"+latitude.toString()+",\"lon\":"+longitude.toString()+"}\n" +
+//                "      }\n" +
+//                "    }\n" +
+//                "  },\n" +
+//                "  \"sort\": [\n" +
+//                "    {\n" +
+//                "      \"_geo_distance\": {\n" +
+//                "        \"location\":{\n" +
+//                "          \"lat\":"+latitude.toString()+",\n" +
+//                "          \"lon\":"+longitude.toString()+"\n" +
+//                "        },\n" +
+//                "        \"order\": \"asc\",\n" +
+//                "        \"unit\": \"km\",\n" +
+//                "        \"distance_type\": \"arc\"\n" +
+//                "      }\n" +
+//                "    }\n" +
+//                "  ]}";
+        request.setJsonEntity(s);
 
         Response response = restHighLevelClient.getLowLevelClient().performRequest(request);
 
         String responseStr = EntityUtils.toString(response.getEntity());
-
-        System.out.println("responseStr = " + responseStr);
 
         JSONObject jsonObject = JSONObject.parseObject(responseStr);
 
