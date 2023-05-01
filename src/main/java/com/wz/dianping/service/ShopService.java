@@ -3,6 +3,7 @@ package com.wz.dianping.service;
 import com.wz.dianping.common.BusinessException;
 import com.wz.dianping.model.ShopModel;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,12 @@ public interface ShopService {
 
     List<ShopModel> recommend(BigDecimal longitude, BigDecimal latitude);
 
-    List<ShopModel> search(BigDecimal longitude, BigDecimal latitude, String keyword,Integer orderby,Integer categoryId,String tags);
+    List<ShopModel> search(BigDecimal longitude, BigDecimal latitude, String keyword,Integer orderby
+            ,Integer categoryId,String tags);
 
     List<Map<String, Object>> searchTags(String keyword, Integer categoryId, String tags);
+
+    Map<String,Object> searchEs(BigDecimal longitude, BigDecimal latitude, String keyword,Integer orderby
+            ,Integer categoryId,String tags) throws IOException;
+
 }

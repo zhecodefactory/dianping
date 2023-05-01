@@ -9,14 +9,23 @@ import com.wz.dianping.model.ShopModel;
 import com.wz.dianping.service.CategoryService;
 import com.wz.dianping.service.SellerService;
 import com.wz.dianping.service.ShopService;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 作者：王哲
@@ -33,6 +42,8 @@ public class ShopServiceImpl implements ShopService {
     SellerService sellerService;
     @Autowired
     CategoryService categoryService;
+    @Autowired
+    RestHighLevelClient restHighLevelClient;
 
     @Override
     @Transactional
@@ -67,7 +78,7 @@ public class ShopServiceImpl implements ShopService {
 
         shopModel.setCategoryModel(categoryService.selectById(shopModel.getCategoryId()));
         shopModel.setSellerModel(sellerService.select(shopModel.getSellerId()));
-        return null;
+        return shopModel;
     }
 
     @Override
@@ -109,5 +120,34 @@ public class ShopServiceImpl implements ShopService {
     @Override
     public List<Map<String, Object>> searchTags(String keyword, Integer categoryId, String tags) {
         return shopModelMapper.searchTags(keyword,tags,categoryId);
+    }
+
+
+    @Override
+    public Map<String, Object> searchEs(BigDecimal longitude, BigDecimal latitude, String keyword, Integer orderby, Integer categoryId, String tags) throws IOException {
+
+        Map<String, Object> map = new HashMap<>();
+
+        SearchRequest searchRequest = new SearchRequest("shop");
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.matchQuery("name",keyword));
+        searchSourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse search = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+
+        ArrayList<Integer> shopIdList = new ArrayList<>();
+        SearchHit[] hits = search.getHits().getHits();
+        for (SearchHit hit : hits) {
+            shopIdList.add(Integer.valueOf(hit.getSourceAsMap().get("id").toString()));
+        }
+
+        List<ShopModel> ShopModelList = shopIdList.stream().map(shopId -> {
+            return selectById(shopId);
+        }).collect(Collectors.toList());
+
+        map.put("ShopModelList",ShopModelList);
+
+        return map;
     }
 }
