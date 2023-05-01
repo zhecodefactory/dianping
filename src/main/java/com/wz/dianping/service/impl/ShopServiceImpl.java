@@ -1,5 +1,7 @@
 package com.wz.dianping.service.impl;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.wz.dianping.common.BusinessError;
 import com.wz.dianping.common.BusinessException;
 import com.wz.dianping.dao.ShopModelMapper;
@@ -9,14 +11,10 @@ import com.wz.dianping.model.ShopModel;
 import com.wz.dianping.service.CategoryService;
 import com.wz.dianping.service.SellerService;
 import com.wz.dianping.service.ShopService;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.client.RequestOptions;
+import org.apache.http.util.EntityUtils;
+import org.elasticsearch.client.Request;
+import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * 作者：王哲
@@ -128,23 +124,80 @@ public class ShopServiceImpl implements ShopService {
 
         Map<String, Object> map = new HashMap<>();
 
-        SearchRequest searchRequest = new SearchRequest("shop");
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.matchQuery("name",keyword));
-        searchSourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
-        searchRequest.source(searchSourceBuilder);
+//        SearchRequest searchRequest = new SearchRequest("shop");
+//        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+//        searchSourceBuilder.query(QueryBuilders.matchQuery("name",keyword));
+//        searchSourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
+//        searchRequest.source(searchSourceBuilder);
+//
+//        SearchResponse search = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+//
+//        ArrayList<Integer> shopIdList = new ArrayList<>();
+//        SearchHit[] hits = search.getHits().getHits();
+//        for (SearchHit hit : hits) {
+//            shopIdList.add(Integer.valueOf(hit.getSourceAsMap().get("id").toString()));
+//        }
+//
+//        List<ShopModel> ShopModelList = shopIdList.stream().map(shopId -> {
+//            return selectById(shopId);
+//        }).collect(Collectors.toList());
+//
+//        map.put("ShopModelList",ShopModelList);
 
-        SearchResponse search = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
 
-        ArrayList<Integer> shopIdList = new ArrayList<>();
-        SearchHit[] hits = search.getHits().getHits();
-        for (SearchHit hit : hits) {
-            shopIdList.add(Integer.valueOf(hit.getSourceAsMap().get("id").toString()));
+        Request request = new Request("GET","/shop/_search");
+        String reqJson = "{\"query\":{\n" +
+                "    \"match\":{\"name\":\""+keyword+"\"}\n" +
+                "  },\n" +
+                "  \"_source\": \"*\", \n" +
+                "  \"script_fields\": {\n" +
+                "    \"distance\": {\n" +
+                "      \"script\": {\n" +
+                "        \"source\": \"haversin(lat,lon,doc['location'].lat,doc['location'].lon)\",\n" +
+                "        \"lang\": \"expression\",\n" +
+                "        \"params\": {\"lat\":"+latitude.toString()+",\"lon\":"+longitude.toString()+"}\n" +
+                "      }\n" +
+                "    }\n" +
+                "  },\n" +
+                "  \"sort\": [\n" +
+                "    {\n" +
+                "      \"_geo_distance\": {\n" +
+                "        \"location\":{\n" +
+                "          \"lat\":"+latitude.toString()+",\n" +
+                "          \"lon\":"+longitude.toString()+"\n" +
+                "        },\n" +
+                "        \"order\": \"asc\",\n" +
+                "        \"unit\": \"km\",\n" +
+                "        \"distance_type\": \"arc\"\n" +
+                "      }\n" +
+                "    }\n" +
+                "  ]}";
+
+        System.out.println("reqJson = " + reqJson);
+
+        request.setJsonEntity(reqJson);
+
+        Response response = restHighLevelClient.getLowLevelClient().performRequest(request);
+
+        String responseStr = EntityUtils.toString(response.getEntity());
+
+        System.out.println("responseStr = " + responseStr);
+
+        JSONObject jsonObject = JSONObject.parseObject(responseStr);
+
+        JSONArray jsonArray = jsonObject.getJSONObject("hits").getJSONArray("hits");
+
+        List<ShopModel> ShopModelList = new ArrayList<>();
+
+        for (int i = 0; i < jsonArray.size(); i++) {
+            JSONObject jsonObject1 = jsonArray.getJSONObject(i);
+            Integer id = Integer.valueOf(jsonObject1.get("_id").toString());
+            BigDecimal distance = new BigDecimal(jsonObject1.getJSONObject("fields").getJSONArray("distance")
+                    .get(0).toString());
+            ShopModel shopModel = selectById(id);
+            shopModel.setDistance(distance.multiply(new BigDecimal(1000).setScale(0,BigDecimal.ROUND_CEILING)).intValue());
+            ShopModelList.add(shopModel);
         }
-
-        List<ShopModel> ShopModelList = shopIdList.stream().map(shopId -> {
-            return selectById(shopId);
-        }).collect(Collectors.toList());
 
         map.put("ShopModelList",ShopModelList);
 
