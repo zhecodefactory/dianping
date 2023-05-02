@@ -60,19 +60,24 @@ public class ShopController {
             throw new BusinessException(BusinessError.PARAMETER_VALIDATION_ERROR, "未获取到经纬度");
         }
 
-        List<ShopModel> shopModelList = (List<ShopModel>) shopService.searchEs(longitude, latitude, keyword, orderby, categoryId, tags).get("ShopModelList");
 
-
+        ///*搜索服务 V1.0*/
 //        List<ShopModel> shopModelList = shopService.search(longitude, latitude, keyword,orderby,categoryId,tags);
+//        List<CategoryModel> categoryModelList = categoryService.selectAll();
+//        List<Map<String,Object>> searchTags = shopService.searchTags(keyword,categoryId,tags);
+
+        ///*搜索服务 V2.0*/
+        Map<String,Object> result = shopService.searchEs(longitude,latitude,keyword,orderby,categoryId,tags);
+        List<ShopModel> shopModelList = (List<ShopModel>) result.get("shop");
         List<CategoryModel> categoryModelList = categoryService.selectAll();
-        List<Map<String,Object>> searchTags = shopService.searchTags(keyword,categoryId,tags);
+        List<Map<String, Object>> tagsAggregation = (List<Map<String, Object>>) result.get("tags");
 
-        HashMap<String, Object> map = new HashMap<>();
-        map.put("shop", shopModelList);
-        map.put("category", categoryModelList);
-        map.put("tags", searchTags);
-
-        return ResultDao.successResultDao(map);
+        //为了以后扩展筛选条件，故不和推荐一样直接返回list的model
+        Map<String,Object> resMap = new HashMap<>();
+        resMap.put("shop",shopModelList);
+        resMap.put("category",categoryModelList);
+        resMap.put("tags",tagsAggregation);
+        return ResultDao.successResultDao(resMap);
     }
 
 }
